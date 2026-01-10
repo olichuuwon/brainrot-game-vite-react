@@ -1,18 +1,16 @@
-import * as React from 'react'
-import { ChakraProvider } from '@chakra-ui/react'
-import * as ReactDOM from 'react-dom/client'
-import App from './App'
+import * as React from "react";
+import * as ReactDOM from "react-dom/client";
+import App from "./App";
+import "./index.css";
 
-const rootElement = document.getElementById('root')
+const rootElement = document.getElementById("root");
 
 if (!rootElement) {
-  throw new Error('root element does not exist')
+  throw new Error("root element does not exist");
 }
 
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
-    <ChakraProvider>
-      <App />
-    </ChakraProvider>
-  </React.StrictMode>,
-)
+    <App />
+  </React.StrictMode>
+);
