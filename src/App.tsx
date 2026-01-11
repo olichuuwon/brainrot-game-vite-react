@@ -1,20 +1,26 @@
 import { useEffect, useRef } from "react";
-import { Application, Assets, Sprite, FederatedPointerEvent, Rectangle } from "pixi.js";
+import {
+  Application,
+  FederatedPointerEvent,
+  Graphics,
+  Rectangle,
+} from "pixi.js";
 
 function App() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const appRef = useRef<Application | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     let destroyed = false;
+    let app: Application | null = null;
 
     const run = async () => {
-      const app = new Application();
+      app = new Application();
+
       await app.init({
-        background: "#1099bb",
+        background: "#2E3440",
         resizeTo: window,
         resolution: window.devicePixelRatio || 1,
         autoDensity: true,
@@ -22,71 +28,59 @@ function App() {
 
       if (destroyed) {
         app.destroy(true);
+        app = null;
         return;
       }
 
-      appRef.current = app;
       container.appendChild(app.canvas);
 
-      // Load the bunny texture
-      const texture = await Assets.load("https://pixijs.com/assets/bunny.png");
-      texture.source.scaleMode = "nearest";
+      // player
+      const player = new Graphics().circle(0, 0, 10).fill(0x8FBCBB);
+      player.eventMode = "static";
+      player.cursor = "pointer";
+      player.position.set(app.screen.width / 2, app.screen.height / 2);
+      app.stage.addChild(player);
 
-      // Create bunny
-      const bunny = new Sprite(texture);
-      bunny.eventMode = "static";
-      bunny.cursor = "pointer";
-      bunny.anchor.set(0.5);
-      bunny.scale.set(3);
-      bunny.position.set(window.innerWidth / 2, window.innerHeight / 2);
-      app.stage.addChild(bunny);
+      // obstacle
+      const obstacle = new Graphics().circle(0, 0, 10).fill(0xBF616A);
+      obstacle.position.set(20 + app.screen.width / 2, 20 + app.screen.height / 2);
+      app.stage.addChild(obstacle);
 
-      // Drag state
-      let dragTarget: Sprite | null = null;
-
-      // Make stage interactive with proper hit area
+      // interaction stage
       app.stage.eventMode = "static";
       app.stage.hitArea = new Rectangle(0, 0, app.screen.width, app.screen.height);
 
-      function onDragMove(event: FederatedPointerEvent) {
-        if (dragTarget?.parent) {
-          dragTarget.parent.toLocal(event.global, undefined, dragTarget.position);
-        }
-      }
+      // drag state
+      let dragTarget: Graphics | null = null;
 
-      function onDragStart(this: Sprite) {
-        this.alpha = 0.5;
-        dragTarget = this;
-        app.stage.on("pointermove", onDragMove);
-      }
+      const onDragMove = (event: FederatedPointerEvent) => {
+        if (!dragTarget?.parent) return;
+        dragTarget.parent.toLocal(event.global, undefined, dragTarget.position);
+      };
 
-      function onDragEnd() {
-        if (dragTarget) {
-          app.stage.off("pointermove", onDragMove);
-          dragTarget.alpha = 1;
-          dragTarget = null;
-        }
-      }
+      const onDragStart = () => {
+        player.alpha = 0.5;
+        dragTarget = player;
+        app!.stage.on("pointermove", onDragMove);
+      };
 
-      bunny.on("pointerdown", onDragStart, bunny);
+      const onDragEnd = () => {
+        if (!dragTarget) return;
+        app!.stage.off("pointermove", onDragMove);
+        dragTarget.alpha = 1;
+        dragTarget = null;
+      };
+
+      player.on("pointerdown", onDragStart);
       app.stage.on("pointerup", onDragEnd);
       app.stage.on("pointerupoutside", onDragEnd);
     };
 
     run();
 
-    return () => {
-      destroyed = true;
-      appRef.current?.destroy(true, { children: true });
-      appRef.current = null;
-    };
   }, []);
 
-  return (
-    <div>
-      <div ref={containerRef} style={{ width: "100vw", height: "100vh" }} />
-    </div>
-  );
+  return <div ref={containerRef} style={{ width: "100vw", height: "100vh" }} />;
 }
 
 export default App;
