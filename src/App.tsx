@@ -6,7 +6,7 @@ import {
   Rectangle,
 } from "pixi.js";
 
-const CIRCLE_RADIUS = 10;
+const CIRCLE_RADIUS = 30;
 
 function collisionDetection(player: Graphics, obstacle: Graphics): boolean {
   const deltaX = player.x - obstacle.x;
@@ -58,8 +58,8 @@ function App() {
         .circle(0, 0, CIRCLE_RADIUS)
         .fill(0xbf616a);
       obstacle.position.set(
-        20 + app.screen.width / 2,
-        20 + app.screen.height / 2
+        CIRCLE_RADIUS * 2 + app.screen.width / 2,
+        CIRCLE_RADIUS + app.screen.height / 2
       );
       app.stage.addChild(obstacle);
 
@@ -100,11 +100,11 @@ function App() {
       // game loop
       app.ticker.add(() => {
         if (collisionDetection(player, obstacle)) {
-          player.clear().circle(0, 0, 10).fill(0xff0000);
-          obstacle.clear().circle(0, 0, 10).fill(0xff0000);
+          player.clear().circle(0, 0, CIRCLE_RADIUS).fill(0xff0000);
+          obstacle.clear().circle(0, 0, CIRCLE_RADIUS).fill(0xff0000);
         } else {
-          player.clear().circle(0, 0, 10).fill(0x8fbcbb);
-          obstacle.clear().circle(0, 0, 10).fill(0xbf616a);
+          player.clear().circle(0, 0, CIRCLE_RADIUS).fill(0x8fbcbb);
+          obstacle.clear().circle(0, 0, CIRCLE_RADIUS).fill(0xbf616a);
         }
       });
     };
