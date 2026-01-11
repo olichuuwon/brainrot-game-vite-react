@@ -6,6 +6,18 @@ import {
   Rectangle,
 } from "pixi.js";
 
+const CIRCLE_RADIUS = 10;
+
+function collisionDetection(player: Graphics, obstacle: Graphics): boolean {
+  const deltaX = player.x - obstacle.x;
+  const deltaY = player.y - obstacle.y;
+  const distanceSquared = deltaX * deltaX + deltaY * deltaY;
+
+  const combinedRadius = CIRCLE_RADIUS + CIRCLE_RADIUS;
+  const collisionThreshold = combinedRadius * combinedRadius;
+
+  return distanceSquared <= collisionThreshold;
+}
 function App() {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -35,20 +47,30 @@ function App() {
       container.appendChild(app.canvas);
 
       // player
-      const player = new Graphics().circle(0, 0, 10).fill(0x8FBCBB);
+      const player = new Graphics().circle(0, 0, CIRCLE_RADIUS).fill(0x8fbcbb);
       player.eventMode = "static";
       player.cursor = "pointer";
       player.position.set(app.screen.width / 2, app.screen.height / 2);
       app.stage.addChild(player);
 
       // obstacle
-      const obstacle = new Graphics().circle(0, 0, 10).fill(0xBF616A);
-      obstacle.position.set(20 + app.screen.width / 2, 20 + app.screen.height / 2);
+      const obstacle = new Graphics()
+        .circle(0, 0, CIRCLE_RADIUS)
+        .fill(0xbf616a);
+      obstacle.position.set(
+        20 + app.screen.width / 2,
+        20 + app.screen.height / 2
+      );
       app.stage.addChild(obstacle);
 
       // interaction stage
       app.stage.eventMode = "static";
-      app.stage.hitArea = new Rectangle(0, 0, app.screen.width, app.screen.height);
+      app.stage.hitArea = new Rectangle(
+        0,
+        0,
+        app.screen.width,
+        app.screen.height
+      );
 
       // drag state
       let dragTarget: Graphics | null = null;
@@ -74,10 +96,20 @@ function App() {
       player.on("pointerdown", onDragStart);
       app.stage.on("pointerup", onDragEnd);
       app.stage.on("pointerupoutside", onDragEnd);
+
+      // game loop
+      app.ticker.add(() => {
+        if (collisionDetection(player, obstacle)) {
+          player.clear().circle(0, 0, 10).fill(0xff0000);
+          obstacle.clear().circle(0, 0, 10).fill(0xff0000);
+        } else {
+          player.clear().circle(0, 0, 10).fill(0x8fbcbb);
+          obstacle.clear().circle(0, 0, 10).fill(0xbf616a);
+        }
+      });
     };
 
     run();
-
   }, []);
 
   return <div ref={containerRef} style={{ width: "100vw", height: "100vh" }} />;
