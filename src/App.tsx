@@ -76,7 +76,7 @@ function App() {
 
       // basic text
       const basicText = new Text({
-        text: "Hello",
+        text: "SCORE: O",
         style: { fontFamily: "Space Grotesk", fill: "white" },
       });
 
@@ -111,13 +111,14 @@ function App() {
       app.stage.on("pointerupoutside", onDragEnd);
 
       // game loop
+      let SCORE = 0;
       app.ticker.add(() => {
         if (collisionDetection(player, obstacle)) {
           player.clear().circle(0, 0, CIRCLE_RADIUS).fill(0xff0000);
-          obstacle.clear().circle(0, 0, CIRCLE_RADIUS).fill(0xff0000);
         } else {
+          SCORE = SCORE + 0.1;
+          basicText.text = `SCORE: ${SCORE.toFixed(0)}`;
           player.clear().circle(0, 0, CIRCLE_RADIUS).fill(0x8fbcbb);
-          obstacle.clear().circle(0, 0, CIRCLE_RADIUS).fill(0xbf616a);
         }
       });
     };
