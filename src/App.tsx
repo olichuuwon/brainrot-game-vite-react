@@ -87,9 +87,9 @@ function App() {
         // scale goes 0 -> 1 as score goes 0 -> 120 (then stays at 1)
         const t = Math.min(1, score / 120);
 
-        const vxMax = 2 + t * 4;
-        const vyMin = 2 + t * 4;
-        const vyMax = 6 + t * 8;
+        const vxMax = 2 + t * 2;
+        const vyMin = 2 + t * 2;
+        const vyMax = 6 + t * 4;
 
         const vx = (Math.random() * 2 - 1) * vxMax;
         const vy = vyMin + Math.random() * (vyMax - vyMin);
