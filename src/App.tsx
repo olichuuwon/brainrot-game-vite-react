@@ -23,12 +23,22 @@ function collisionDetection(player: Graphics, obstacle: Graphics): boolean {
 function App() {
   const containerRef = useRef<HTMLDivElement>(null);
 
+  type Phase = "idle" | "playing" | "gameover";
+
+  const phaseRef = useRef<Phase>("idle");
+
+  const setPhase = (p: Phase) => {
+    phaseRef.current = p;
+  };
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     let destroyed = false;
     let app: Application | null = null;
+
+    let gameOverTimeout: number | null = null;
 
     const run = async () => {
       app = new Application();
@@ -76,7 +86,6 @@ function App() {
 
       // basic text
       const basicText = new Text({
-        text: "SCORE: O",
         style: { fontFamily: "Space Grotesk", fill: "white" },
       });
 
@@ -89,21 +98,31 @@ function App() {
       let dragTarget: Graphics | null = null;
 
       const onDragMove = (event: FederatedPointerEvent) => {
+        if (phaseRef.current === "gameover") return;
         if (!dragTarget?.parent) return;
         dragTarget.parent.toLocal(event.global, undefined, dragTarget.position);
       };
 
+      const stopDragging = () => {
+        if (!app) return;
+        app.stage.off("pointermove", onDragMove);
+        if (dragTarget) dragTarget.alpha = 1;
+        dragTarget = null;
+      };
+
       const onDragStart = () => {
+        if (phaseRef.current === "gameover") return;
+
+        setPhase("playing");
         player.alpha = 0.5;
         dragTarget = player;
         app!.stage.on("pointermove", onDragMove);
       };
 
       const onDragEnd = () => {
-        if (!dragTarget) return;
-        app!.stage.off("pointermove", onDragMove);
-        dragTarget.alpha = 1;
-        dragTarget = null;
+        if (phaseRef.current === "gameover") return;
+        setPhase("idle");
+        stopDragging();
       };
 
       player.on("pointerdown", onDragStart);
@@ -112,14 +131,43 @@ function App() {
 
       // game loop
       let SCORE = 0;
+
       app.ticker.add(() => {
+        const phase = phaseRef.current;
+
+        if (phase === "idle") {
+          basicText.text = "HOLD CIRCLE TO PLAY";
+          return;
+        }
+
+        if (phase === "gameover") {
+          return;
+        }
+
         if (collisionDetection(player, obstacle)) {
           player.clear().circle(0, 0, CIRCLE_RADIUS).fill(0xff0000);
-        } else {
-          SCORE = SCORE + 0.1;
-          basicText.text = `SCORE: ${SCORE.toFixed(0)}`;
-          player.clear().circle(0, 0, CIRCLE_RADIUS).fill(0x8fbcbb);
+          basicText.text = `GAME OVER! FINAL SCORE: ${SCORE.toFixed(0)}`;
+
+          setPhase("gameover");
+          stopDragging();
+
+          if (gameOverTimeout) window.clearTimeout(gameOverTimeout);
+          gameOverTimeout = window.setTimeout(() => {
+            SCORE = 0;
+            basicText.text = "SCORE: 0";
+            player.alpha = 1;
+            player.clear().circle(0, 0, CIRCLE_RADIUS).fill(0x8fbcbb);
+            player.x = app!.screen.width / 2;
+            player.y = app!.screen.height / 2;
+            setPhase("idle");
+          }, 5000);
+
+          return;
         }
+
+        SCORE = SCORE + 0.1;
+        basicText.text = `SCORE: ${SCORE.toFixed(0)}`;
+        player.clear().circle(0, 0, CIRCLE_RADIUS).fill(0x8fbcbb);
       });
     };
 
