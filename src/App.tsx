@@ -4,6 +4,7 @@ import {
   FederatedPointerEvent,
   Graphics,
   Rectangle,
+  Text,
 } from "pixi.js";
 
 const CIRCLE_RADIUS = 30;
@@ -18,6 +19,7 @@ function collisionDetection(player: Graphics, obstacle: Graphics): boolean {
 
   return distanceSquared <= collisionThreshold;
 }
+
 function App() {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -71,6 +73,17 @@ function App() {
         app.screen.width,
         app.screen.height
       );
+
+      // basic text
+      const basicText = new Text({
+        text: "Hello",
+        style: { fontFamily: "Space Grotesk", fill: "white" },
+      });
+
+      basicText.x = 20;
+      basicText.y = 20;
+
+      app.stage.addChild(basicText);
 
       // drag state
       let dragTarget: Graphics | null = null;
