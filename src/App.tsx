@@ -116,15 +116,47 @@ function App() {
         app.screen.height
       );
 
-      // basic text
-      const basicText = new Text({
+      // game status text
+      const topText = new Text({
         style: { fontFamily: "Space Grotesk", fill: "white" },
       });
 
-      basicText.x = 20;
-      basicText.y = 20;
+      topText.x = 20;
+      topText.y = 20;
 
-      app.stage.addChild(basicText);
+      topText.text = "SCORE: 0";
+
+      app.stage.addChild(topText);
+
+      const INSTRUCTIONS =
+        "HOLD TO PLAY, " +
+        "RELEASE TO PAUSE\n" +
+        "DRAG TO MOVE, " +
+        "AVOID RED";
+
+      const middleText = new Text({
+        text: INSTRUCTIONS,
+        style: {
+          fontFamily: "Space Grotesk",
+          fill: "white",
+          align: "center",
+        },
+      });
+
+      middleText.anchor.set(0.5);
+      middleText.position.set(app.screen.width / 2, app.screen.height / 2 - 80);
+
+      app.stage.addChild(middleText);
+
+      const bottomText = new Text({
+        style: { fontFamily: "Space Grotesk", fill: "white" },
+      });
+
+      bottomText.x = 20;
+      bottomText.y = app.screen.height - 50;
+      bottomText.text = "HIGH SCORE: 0";
+
+      app.stage.addChild(bottomText);
 
       // drag state
       let dragTarget: Graphics | null = null;
@@ -147,6 +179,8 @@ function App() {
         if (dragTarget) return;
 
         setPhase("playing");
+        middleText.text = "";
+
         player.alpha = 0.5;
         dragTarget = player;
         app!.stage.on("pointermove", onDragMove);
@@ -164,14 +198,20 @@ function App() {
 
       // game loop
       let SCORE = 0;
+      let HIGH_SCORE = 0;
       let lastShownScore = -1;
 
       const triggerGameOver = () => {
         player.clear().circle(0, 0, CIRCLE_RADIUS).fill(0xff0000);
-        basicText.text = `GAME OVER! FINAL SCORE: ${Math.floor(SCORE)}`;
+        topText.text = `GAME OVER! FINAL SCORE: ${Math.floor(SCORE)}`;
 
         setPhase("gameover");
         stopDragging();
+
+        if (SCORE > HIGH_SCORE) {
+          HIGH_SCORE = Math.floor(SCORE);
+          bottomText.text = `HIGH SCORE: ${HIGH_SCORE}`;
+        }
 
         if (gameOverTimeout) window.clearTimeout(gameOverTimeout);
         gameOverTimeout = window.setTimeout(() => {
@@ -181,13 +221,15 @@ function App() {
 
           clearObstacles();
 
-          basicText.text = "SCORE: 0";
+          topText.text = "SCORE: 0";
           player.alpha = 1;
           player.clear().circle(0, 0, CIRCLE_RADIUS).fill(0x8fbcbb);
           player.x = app!.screen.width / 2;
           player.y = app!.screen.height / 2;
 
           setPhase("idle");
+          topText.text = `SCORE: ${Math.floor(SCORE)}`;
+          middleText.text = INSTRUCTIONS;
         }, 5000);
       };
 
@@ -195,7 +237,6 @@ function App() {
         const phase = phaseRef.current;
 
         if (phase === "idle") {
-          basicText.text = "HOLD CIRCLE TO PLAY";
           return;
         }
 
@@ -260,7 +301,7 @@ function App() {
         const shown = Math.floor(SCORE);
         if (shown !== lastShownScore) {
           lastShownScore = shown;
-          basicText.text = `SCORE: ${shown}`;
+          topText.text = `SCORE: ${shown}`;
         }
       });
     };
