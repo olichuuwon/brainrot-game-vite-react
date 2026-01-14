@@ -19,7 +19,10 @@ function collisionDetection(player: Graphics, obstacle: Graphics): boolean {
   return dist2 <= combined * combined;
 }
 
-function createUI(app: Application, instructions: string) {
+async function createUI(app: Application, instructions: string) {
+  await document.fonts.load("16px 'Space Grotesk'");
+  await document.fonts.ready;
+
   const topText = new Text({
     text: "SCORE: 0",
     style: { fontFamily: "Space Grotesk", fill: "white" },
