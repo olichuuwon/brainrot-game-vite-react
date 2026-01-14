@@ -15,8 +15,7 @@ function collisionDetection(player: Graphics, obstacle: Graphics): boolean {
   const dx = player.x - obstacle.x;
   const dy = player.y - obstacle.y;
   const dist2 = dx * dx + dy * dy;
-
-  const combined = CIRCLE_RADIUS + CIRCLE_RADIUS;
+  const combined = CIRCLE_RADIUS * 2;
   return dist2 <= combined * combined;
 }
 
@@ -30,11 +29,7 @@ function createUI(app: Application, instructions: string) {
 
   const middleText = new Text({
     text: instructions,
-    style: {
-      fontFamily: "Space Grotesk",
-      fill: "white",
-      align: "center",
-    },
+    style: { fontFamily: "Space Grotesk", fill: "white", align: "center" },
   });
   middleText.anchor.set(0.5);
   middleText.position.set(app.screen.width / 2, app.screen.height / 2 - 80);
@@ -60,8 +55,8 @@ function createUI(app: Application, instructions: string) {
     showGameOver(score: number) {
       topText.text = `GAME OVER! FINAL SCORE: ${Math.floor(score)}`;
     },
-    setHighScore(high: number) {
-      bottomText.text = `HIGH SCORE: ${high}`;
+    setHighScore(score: number) {
+      bottomText.text = `HIGH SCORE: ${score}`;
     },
     setInstructions(text: string) {
       middleText.text = text;
@@ -79,17 +74,17 @@ function createPlayer(app: Application) {
   player.position.set(app.screen.width / 2, app.screen.height / 2);
   app.stage.addChild(player);
 
-  const reset = () => {
-    player.alpha = 1;
-    player.clear().circle(0, 0, CIRCLE_RADIUS).fill(0x8fbcbb);
-    player.position.set(app.screen.width / 2, app.screen.height / 2);
+  return {
+    player,
+    reset() {
+      player.alpha = 1;
+      player.clear().circle(0, 0, CIRCLE_RADIUS).fill(0x8fbcbb);
+      player.position.set(app.screen.width / 2, app.screen.height / 2);
+    },
+    setDead() {
+      player.clear().circle(0, 0, CIRCLE_RADIUS).fill(0xff0000);
+    },
   };
-
-  const setDead = () => {
-    player.clear().circle(0, 0, CIRCLE_RADIUS).fill(0xff0000);
-  };
-
-  return { player, reset, setDead };
 }
 
 type Obstacle = { g: Graphics; vx: number; vy: number };
@@ -102,12 +97,9 @@ function createObstacleSystem(app: Application) {
 
     const minX = CIRCLE_RADIUS;
     const maxX = app.screen.width - CIRCLE_RADIUS;
-    const x = minX + Math.random() * (maxX - minX);
+    g.position.set(minX + Math.random() * (maxX - minX), -CIRCLE_RADIUS);
 
-    g.position.set(x, -CIRCLE_RADIUS);
-
-    // difficulty ramp via velocity ranges
-    const t = Math.min(1, score / 120);
+    const t = score / (score + 250);
     const vxMax = 2 + t * 2;
     const vyMin = 2 + t * 2;
     const vyMax = 6 + t * 4;
@@ -119,14 +111,6 @@ function createObstacleSystem(app: Application) {
     obstacles.push({ g, vx, vy });
   };
 
-  const clear = () => {
-    for (const ob of obstacles) {
-      app.stage.removeChild(ob.g);
-      ob.g.destroy();
-    }
-    obstacles.length = 0;
-  };
-
   const update = (deltaTime: number) => {
     for (let i = obstacles.length - 1; i >= 0; i--) {
       const ob = obstacles[i];
@@ -134,18 +118,11 @@ function createObstacleSystem(app: Application) {
       ob.g.x += ob.vx * deltaTime;
       ob.g.y += ob.vy * deltaTime;
 
-      // bounce x so they don't drift off the sides
       const minX = CIRCLE_RADIUS;
       const maxX = app.screen.width - CIRCLE_RADIUS;
-      if (ob.g.x <= minX) {
-        ob.g.x = minX;
-        ob.vx *= -1;
-      } else if (ob.g.x >= maxX) {
-        ob.g.x = maxX;
-        ob.vx *= -1;
-      }
 
-      // offscreen cleanup
+      if (ob.g.x <= minX || ob.g.x >= maxX) ob.vx *= -1;
+
       if (ob.g.y - CIRCLE_RADIUS > app.screen.height) {
         app.stage.removeChild(ob.g);
         ob.g.destroy();
@@ -154,34 +131,47 @@ function createObstacleSystem(app: Application) {
     }
   };
 
-  return { obstacles, spawn, clear, update };
+  const clear = () => {
+    for (const ob of obstacles) {
+      app.stage.removeChild(ob.g);
+      ob.g.destroy();
+    }
+    obstacles.length = 0;
+  };
+
+  return { obstacles, spawn, update, clear };
 }
 
 function createSpawner() {
-  let spawnElapsedMs = 0;
-  const CHECK_MS = 120;
+  let timeToNextMs = 900;
+  let playTimeMs = 0;
+
+  const rand = (min: number, max: number) => min + Math.random() * (max - min);
+
+  const nextIntervalMs = () => {
+    const minutes = playTimeMs / 60000;
+    const d = Math.log1p(minutes * 5);
+
+    const base = Math.max(380, 900 - d * 70);
+    const jitter = base * rand(-0.08, 0.08);
+
+    return Math.max(280, base + jitter);
+  };
 
   return {
     reset() {
-      spawnElapsedMs = 0;
+      playTimeMs = 0;
+      timeToNextMs = 900;
     },
-     // calls `spawn()` 0..N times based on elapsed time and chance
-    tick(dtMs: number, score: number, spawn: (score: number) => void) {
-      spawnElapsedMs += dtMs;
+    tick(dtMs: number, spawn: () => void, canSpawn: () => boolean) {
+      playTimeMs += dtMs;
+      timeToNextMs -= dtMs;
 
-      const t = Math.min(1, score / 120);
-      const spawnChance = 0.08 + t * 0.1; // 8% -> 18%
-
-      let rollsThisFrame = 0;
-      const MAX_ROLLS_PER_FRAME = 2;
-
-      while (spawnElapsedMs >= CHECK_MS && rollsThisFrame < MAX_ROLLS_PER_FRAME) {
-        spawnElapsedMs -= CHECK_MS;
-        rollsThisFrame++;
-
-        if (Math.random() < spawnChance) {
-          spawn(score);
-        }
+      let spawned = 0;
+      while (timeToNextMs <= 0 && spawned < 2) {
+        if (canSpawn()) spawn();
+        spawned++;
+        timeToNextMs += nextIntervalMs();
       }
     },
   };
@@ -195,14 +185,13 @@ function bindDragControls(args: {
   onStartPlaying: () => void;
   onStopPlaying: () => void;
 }) {
-  const { app, player, phaseRef, setPhase, onStartPlaying, onStopPlaying } = args;
-
+  const { app, player, phaseRef, setPhase, onStartPlaying, onStopPlaying } =
+    args;
   let dragTarget: Graphics | null = null;
 
-  const onDragMove = (event: FederatedPointerEvent) => {
-    if (phaseRef.current === "gameover") return;
-    if (!dragTarget?.parent) return;
-    dragTarget.parent.toLocal(event.global, undefined, dragTarget.position);
+  const onDragMove = (e: FederatedPointerEvent) => {
+    if (!dragTarget || phaseRef.current === "gameover") return;
+    dragTarget.parent?.toLocal(e.global, undefined, dragTarget.position);
   };
 
   const stopDragging = () => {
@@ -212,12 +201,9 @@ function bindDragControls(args: {
   };
 
   const onDragStart = () => {
-    if (phaseRef.current === "gameover") return;
-    if (dragTarget) return;
-
+    if (phaseRef.current === "gameover" || dragTarget) return;
     setPhase("playing");
     onStartPlaying();
-
     player.alpha = 0.5;
     dragTarget = player;
     app.stage.on("pointermove", onDragMove);
@@ -225,7 +211,6 @@ function bindDragControls(args: {
 
   const onDragEnd = () => {
     if (phaseRef.current === "gameover") return;
-
     setPhase("idle");
     stopDragging();
     onStopPlaying();
@@ -248,11 +233,7 @@ function bindDragControls(args: {
 
 function App() {
   const containerRef = useRef<HTMLDivElement>(null);
-
   const phaseRef = useRef<Phase>("idle");
-  const setPhase = (p: Phase) => {
-    phaseRef.current = p;
-  };
 
   useEffect(() => {
     const container = containerRef.current;
@@ -276,16 +257,18 @@ function App() {
       }
 
       container.appendChild(app.canvas);
-
-      // interaction stage
       app.stage.eventMode = "static";
-      app.stage.hitArea = new Rectangle(0, 0, app.screen.width, app.screen.height);
+      app.stage.hitArea = new Rectangle(
+        0,
+        0,
+        app.screen.width,
+        app.screen.height
+      );
 
-      const INSTRUCTIONS =
-        "HOLD TO PLAY, " + "RELEASE TO PAUSE\n" + "DRAG TO MOVE, " + "AVOID RED BALLS";
+      const INSTRUCTIONS = "HOLD TO PLAY\nRELEASE TO PAUSE\nDRAG TO MOVE";
 
       const ui = createUI(app, INSTRUCTIONS);
-      const { player, reset: resetPlayer, setDead } = createPlayer(app);
+      const { player, reset, setDead } = createPlayer(app);
       const obstacles = createObstacleSystem(app);
       const spawner = createSpawner();
 
@@ -296,8 +279,8 @@ function App() {
         score = 0;
         spawner.reset();
         obstacles.clear();
-        resetPlayer();
-        setPhase("idle");
+        reset();
+        phaseRef.current = "idle";
         ui.setInstructions(INSTRUCTIONS);
         ui.setScore(score);
       };
@@ -305,8 +288,7 @@ function App() {
       const triggerGameOver = (stopDragging: () => void) => {
         setDead();
         ui.showGameOver(score);
-
-        setPhase("gameover");
+        phaseRef.current = "gameover";
         stopDragging();
 
         const final = Math.floor(score);
@@ -315,70 +297,48 @@ function App() {
           ui.setHighScore(highScore);
         }
 
-        if (gameOverTimeout) window.clearTimeout(gameOverTimeout);
-        gameOverTimeout = window.setTimeout(() => {
-          resetGame();
-        }, 5000);
+        gameOverTimeout = window.setTimeout(resetGame, 5000);
       };
 
       const drag = bindDragControls({
         app,
         player,
         phaseRef,
-        setPhase,
+        setPhase: (p) => (phaseRef.current = p),
         onStartPlaying: () => ui.clearInstructions(),
-        onStopPlaying: () => {
-          ui.setInstructions("PAUSED, DRAG TO CONTINUE");
-        },
+        onStopPlaying: () => ui.setInstructions("PAUSED"),
       });
 
-      const onTick = (ticker: { deltaMS: number; deltaTime: number }) => {
-        const phase = phaseRef.current;
-        if (phase !== "playing") return;
+      app.ticker.add((ticker) => {
+        if (phaseRef.current !== "playing") return;
 
         const dtMS = Math.min(ticker.deltaMS, 50);
 
-        // spawn
-        spawner.tick(dtMS, score, obstacles.spawn);
+        spawner.tick(
+          dtMS,
+          () => obstacles.spawn(score),
+          () => obstacles.obstacles.length < 12
+        );
 
-        // move
         obstacles.update(ticker.deltaTime);
 
-        // collide
-        for (let i = obstacles.obstacles.length - 1; i >= 0; i--) {
-          const ob = obstacles.obstacles[i];
+        for (const ob of obstacles.obstacles) {
           if (collisionDetection(player, ob.g)) {
             triggerGameOver(drag.stopDragging);
             return;
           }
         }
 
-        // score
         score += 0.1;
         ui.setScore(score);
-      };
-
-      app.ticker.add(onTick);
-
-      // cleanup for this run()
-      return () => {
-        if (gameOverTimeout) window.clearTimeout(gameOverTimeout);
-        drag.cleanup();
-        app.ticker.remove(onTick);
-        app.destroy(true);
-      };
+      });
     };
 
-    let cleanupRun: null | (() => void) = null;
-
-    run().then((cleanup) => {
-      if (typeof cleanup === "function") cleanupRun = cleanup;
-    });
+    run();
 
     return () => {
       destroyed = true;
       if (gameOverTimeout) window.clearTimeout(gameOverTimeout);
-      if (cleanupRun) cleanupRun();
     };
   }, []);
 
