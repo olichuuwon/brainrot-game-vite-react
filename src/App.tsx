@@ -25,7 +25,6 @@ function collisionDetection(player: Graphics, obstacle: Graphics): boolean {
 }
 
 function createUI(app: Application, instructions: string) {
-
   const topText = new Text({
     text: "SCORE: 0",
     style: { fontFamily: "Space Grotesk", fill: "white" },
@@ -149,32 +148,36 @@ function createObstacleSystem(app: Application) {
 }
 
 function createSpawner() {
-  let timeToNextMs = 900;
+  let timeToNextMs = 750;
   let playTimeMs = 0;
 
   const rand = (min: number, max: number) => min + Math.random() * (max - min);
 
   const nextIntervalMs = () => {
     const minutes = playTimeMs / 60000;
-    const d = Math.log1p(minutes * 5);
 
-    const base = Math.max(380, 900 - d * 70);
-    const jitter = base * rand(-0.08, 0.08);
+    const d = Math.log1p(minutes * 7);
 
-    return Math.max(280, base + jitter);
+    const base = Math.max(320, 820 - d * 90);
+
+    const jitter = base * rand(-0.12, 0.12);
+
+    return Math.max(240, base + jitter);
   };
 
   return {
     reset() {
       playTimeMs = 0;
-      timeToNextMs = 900;
+      timeToNextMs = 750;
     },
     tick(dtMs: number, spawn: () => void, canSpawn: () => boolean) {
       playTimeMs += dtMs;
       timeToNextMs -= dtMs;
 
       let spawned = 0;
-      while (timeToNextMs <= 0 && spawned < 2) {
+      const MAX_SPAWNS_PER_TICK = 3;
+
+      while (timeToNextMs <= 0 && spawned < MAX_SPAWNS_PER_TICK) {
         if (canSpawn()) spawn();
         spawned++;
         timeToNextMs += nextIntervalMs();
