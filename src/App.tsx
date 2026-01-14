@@ -9,24 +9,247 @@ import {
 
 const CIRCLE_RADIUS = 30;
 
+type Phase = "idle" | "playing" | "gameover";
+
 function collisionDetection(player: Graphics, obstacle: Graphics): boolean {
-  const deltaX = player.x - obstacle.x;
-  const deltaY = player.y - obstacle.y;
-  const distanceSquared = deltaX * deltaX + deltaY * deltaY;
+  const dx = player.x - obstacle.x;
+  const dy = player.y - obstacle.y;
+  const dist2 = dx * dx + dy * dy;
 
-  const combinedRadius = CIRCLE_RADIUS + CIRCLE_RADIUS;
-  const collisionThreshold = combinedRadius * combinedRadius;
+  const combined = CIRCLE_RADIUS + CIRCLE_RADIUS;
+  return dist2 <= combined * combined;
+}
 
-  return distanceSquared <= collisionThreshold;
+function createUI(app: Application, instructions: string) {
+  const topText = new Text({
+    text: "SCORE: 0",
+    style: { fontFamily: "Space Grotesk", fill: "white" },
+  });
+  topText.position.set(20, 20);
+  app.stage.addChild(topText);
+
+  const middleText = new Text({
+    text: instructions,
+    style: {
+      fontFamily: "Space Grotesk",
+      fill: "white",
+      align: "center",
+    },
+  });
+  middleText.anchor.set(0.5);
+  middleText.position.set(app.screen.width / 2, app.screen.height / 2 - 80);
+  app.stage.addChild(middleText);
+
+  const bottomText = new Text({
+    text: "HIGH SCORE: 0",
+    style: { fontFamily: "Space Grotesk", fill: "white" },
+  });
+  bottomText.position.set(20, app.screen.height - 50);
+  app.stage.addChild(bottomText);
+
+  let lastShownScore = -1;
+
+  return {
+    setScore(score: number) {
+      const shown = Math.floor(score);
+      if (shown !== lastShownScore) {
+        lastShownScore = shown;
+        topText.text = `SCORE: ${shown}`;
+      }
+    },
+    showGameOver(score: number) {
+      topText.text = `GAME OVER! FINAL SCORE: ${Math.floor(score)}`;
+    },
+    setHighScore(high: number) {
+      bottomText.text = `HIGH SCORE: ${high}`;
+    },
+    setInstructions(text: string) {
+      middleText.text = text;
+    },
+    clearInstructions() {
+      middleText.text = "";
+    },
+  };
+}
+
+function createPlayer(app: Application) {
+  const player = new Graphics().circle(0, 0, CIRCLE_RADIUS).fill(0x8fbcbb);
+  player.eventMode = "static";
+  player.cursor = "pointer";
+  player.position.set(app.screen.width / 2, app.screen.height / 2);
+  app.stage.addChild(player);
+
+  const reset = () => {
+    player.alpha = 1;
+    player.clear().circle(0, 0, CIRCLE_RADIUS).fill(0x8fbcbb);
+    player.position.set(app.screen.width / 2, app.screen.height / 2);
+  };
+
+  const setDead = () => {
+    player.clear().circle(0, 0, CIRCLE_RADIUS).fill(0xff0000);
+  };
+
+  return { player, reset, setDead };
+}
+
+type Obstacle = { g: Graphics; vx: number; vy: number };
+
+function createObstacleSystem(app: Application) {
+  const obstacles: Obstacle[] = [];
+
+  const spawn = (score: number) => {
+    const g = new Graphics().circle(0, 0, CIRCLE_RADIUS).fill(0xbf616a);
+
+    const minX = CIRCLE_RADIUS;
+    const maxX = app.screen.width - CIRCLE_RADIUS;
+    const x = minX + Math.random() * (maxX - minX);
+
+    g.position.set(x, -CIRCLE_RADIUS);
+
+    // difficulty ramp via velocity ranges
+    const t = Math.min(1, score / 120);
+    const vxMax = 2 + t * 2;
+    const vyMin = 2 + t * 2;
+    const vyMax = 6 + t * 4;
+
+    const vx = (Math.random() * 2 - 1) * vxMax;
+    const vy = vyMin + Math.random() * (vyMax - vyMin);
+
+    app.stage.addChild(g);
+    obstacles.push({ g, vx, vy });
+  };
+
+  const clear = () => {
+    for (const ob of obstacles) {
+      app.stage.removeChild(ob.g);
+      ob.g.destroy();
+    }
+    obstacles.length = 0;
+  };
+
+  const update = (deltaTime: number) => {
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+      const ob = obstacles[i];
+
+      ob.g.x += ob.vx * deltaTime;
+      ob.g.y += ob.vy * deltaTime;
+
+      // bounce x so they don't drift off the sides
+      const minX = CIRCLE_RADIUS;
+      const maxX = app.screen.width - CIRCLE_RADIUS;
+      if (ob.g.x <= minX) {
+        ob.g.x = minX;
+        ob.vx *= -1;
+      } else if (ob.g.x >= maxX) {
+        ob.g.x = maxX;
+        ob.vx *= -1;
+      }
+
+      // offscreen cleanup
+      if (ob.g.y - CIRCLE_RADIUS > app.screen.height) {
+        app.stage.removeChild(ob.g);
+        ob.g.destroy();
+        obstacles.splice(i, 1);
+      }
+    }
+  };
+
+  return { obstacles, spawn, clear, update };
+}
+
+function createSpawner() {
+  let spawnElapsedMs = 0;
+  const CHECK_MS = 120;
+
+  return {
+    reset() {
+      spawnElapsedMs = 0;
+    },
+     // calls `spawn()` 0..N times based on elapsed time and chance
+    tick(dtMs: number, score: number, spawn: (score: number) => void) {
+      spawnElapsedMs += dtMs;
+
+      const t = Math.min(1, score / 120);
+      const spawnChance = 0.08 + t * 0.1; // 8% -> 18%
+
+      let rollsThisFrame = 0;
+      const MAX_ROLLS_PER_FRAME = 2;
+
+      while (spawnElapsedMs >= CHECK_MS && rollsThisFrame < MAX_ROLLS_PER_FRAME) {
+        spawnElapsedMs -= CHECK_MS;
+        rollsThisFrame++;
+
+        if (Math.random() < spawnChance) {
+          spawn(score);
+        }
+      }
+    },
+  };
+}
+
+function bindDragControls(args: {
+  app: Application;
+  player: Graphics;
+  phaseRef: React.MutableRefObject<Phase>;
+  setPhase: (p: Phase) => void;
+  onStartPlaying: () => void;
+  onStopPlaying: () => void;
+}) {
+  const { app, player, phaseRef, setPhase, onStartPlaying, onStopPlaying } = args;
+
+  let dragTarget: Graphics | null = null;
+
+  const onDragMove = (event: FederatedPointerEvent) => {
+    if (phaseRef.current === "gameover") return;
+    if (!dragTarget?.parent) return;
+    dragTarget.parent.toLocal(event.global, undefined, dragTarget.position);
+  };
+
+  const stopDragging = () => {
+    app.stage.off("pointermove", onDragMove);
+    if (dragTarget) dragTarget.alpha = 1;
+    dragTarget = null;
+  };
+
+  const onDragStart = () => {
+    if (phaseRef.current === "gameover") return;
+    if (dragTarget) return;
+
+    setPhase("playing");
+    onStartPlaying();
+
+    player.alpha = 0.5;
+    dragTarget = player;
+    app.stage.on("pointermove", onDragMove);
+  };
+
+  const onDragEnd = () => {
+    if (phaseRef.current === "gameover") return;
+
+    setPhase("idle");
+    stopDragging();
+    onStopPlaying();
+  };
+
+  player.on("pointerdown", onDragStart);
+  app.stage.on("pointerup", onDragEnd);
+  app.stage.on("pointerupoutside", onDragEnd);
+
+  return {
+    stopDragging,
+    cleanup() {
+      stopDragging();
+      player.off("pointerdown", onDragStart);
+      app.stage.off("pointerup", onDragEnd);
+      app.stage.off("pointerupoutside", onDragEnd);
+    },
+  };
 }
 
 function App() {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  type Phase = "idle" | "playing" | "gameover";
-
   const phaseRef = useRef<Phase>("idle");
-
   const setPhase = (p: Phase) => {
     phaseRef.current = p;
   };
@@ -36,13 +259,10 @@ function App() {
     if (!container) return;
 
     let destroyed = false;
-    let app: Application | null = null;
-
     let gameOverTimeout: number | null = null;
 
     const run = async () => {
-      app = new Application();
-
+      const app = new Application();
       await app.init({
         background: "#2E3440",
         resizeTo: window,
@@ -52,265 +272,113 @@ function App() {
 
       if (destroyed) {
         app.destroy(true);
-        app = null;
         return;
       }
 
       container.appendChild(app.canvas);
 
-      // player
-      const player = new Graphics().circle(0, 0, CIRCLE_RADIUS).fill(0x8fbcbb);
-      player.eventMode = "static";
-      player.cursor = "pointer";
-      player.position.set(app.screen.width / 2, app.screen.height / 2);
-      app.stage.addChild(player);
-
-      // obstacles
-      type Obstacle = { g: Graphics; vx: number; vy: number };
-      const obstacles: Obstacle[] = [];
-
-      let spawnElapsedMs = 0;
-      const CHECK_MS = 120;
-
-      const spawnObstacle = (score: number) => {
-        if (!app) return;
-
-        const g = new Graphics().circle(0, 0, CIRCLE_RADIUS).fill(0xbf616a);
-
-        const minX = CIRCLE_RADIUS;
-        const maxX = app.screen.width - CIRCLE_RADIUS;
-        const x = minX + Math.random() * (maxX - minX);
-
-        g.position.set(x, -CIRCLE_RADIUS);
-
-        // difficulty ramp via velocity ranges
-        // scale goes 0 -> 1 as score goes 0 -> 120 (then stays at 1)
-        const t = Math.min(1, score / 120);
-
-        const vxMax = 2 + t * 2;
-        const vyMin = 2 + t * 2;
-        const vyMax = 6 + t * 4;
-
-        const vx = (Math.random() * 2 - 1) * vxMax;
-        const vy = vyMin + Math.random() * (vyMax - vyMin);
-
-        app.stage.addChild(g);
-        obstacles.push({ g, vx, vy });
-      };
-
-      const clearObstacles = () => {
-        if (!app) return;
-        for (const ob of obstacles) {
-          app.stage.removeChild(ob.g);
-          ob.g.destroy();
-        }
-        obstacles.length = 0;
-      };
-
       // interaction stage
       app.stage.eventMode = "static";
-      app.stage.hitArea = new Rectangle(
-        0,
-        0,
-        app.screen.width,
-        app.screen.height
-      );
-
-      // game status text
-      const topText = new Text({
-        style: { fontFamily: "Space Grotesk", fill: "white" },
-      });
-
-      topText.x = 20;
-      topText.y = 20;
-
-      topText.text = "SCORE: 0";
-
-      app.stage.addChild(topText);
+      app.stage.hitArea = new Rectangle(0, 0, app.screen.width, app.screen.height);
 
       const INSTRUCTIONS =
-        "HOLD TO PLAY, " +
-        "RELEASE TO PAUSE\n" +
-        "DRAG TO MOVE, " +
-        "AVOID RED";
+        "HOLD TO PLAY, " + "RELEASE TO PAUSE\n" + "DRAG TO MOVE, " + "AVOID RED BALLS";
 
-      const middleText = new Text({
-        text: INSTRUCTIONS,
-        style: {
-          fontFamily: "Space Grotesk",
-          fill: "white",
-          align: "center",
-        },
-      });
+      const ui = createUI(app, INSTRUCTIONS);
+      const { player, reset: resetPlayer, setDead } = createPlayer(app);
+      const obstacles = createObstacleSystem(app);
+      const spawner = createSpawner();
 
-      middleText.anchor.set(0.5);
-      middleText.position.set(app.screen.width / 2, app.screen.height / 2 - 80);
+      let score = 0;
+      let highScore = 0;
 
-      app.stage.addChild(middleText);
-
-      const bottomText = new Text({
-        style: { fontFamily: "Space Grotesk", fill: "white" },
-      });
-
-      bottomText.x = 20;
-      bottomText.y = app.screen.height - 50;
-      bottomText.text = "HIGH SCORE: 0";
-
-      app.stage.addChild(bottomText);
-
-      // drag state
-      let dragTarget: Graphics | null = null;
-
-      const onDragMove = (event: FederatedPointerEvent) => {
-        if (phaseRef.current === "gameover") return;
-        if (!dragTarget?.parent) return;
-        dragTarget.parent.toLocal(event.global, undefined, dragTarget.position);
-      };
-
-      const stopDragging = () => {
-        if (!app) return;
-        app.stage.off("pointermove", onDragMove);
-        if (dragTarget) dragTarget.alpha = 1;
-        dragTarget = null;
-      };
-
-      const onDragStart = () => {
-        if (phaseRef.current === "gameover") return;
-        if (dragTarget) return;
-
-        setPhase("playing");
-        middleText.text = "";
-
-        player.alpha = 0.5;
-        dragTarget = player;
-        app!.stage.on("pointermove", onDragMove);
-      };
-
-      const onDragEnd = () => {
-        if (phaseRef.current === "gameover") return;
+      const resetGame = () => {
+        score = 0;
+        spawner.reset();
+        obstacles.clear();
+        resetPlayer();
         setPhase("idle");
-        stopDragging();
+        ui.setInstructions(INSTRUCTIONS);
+        ui.setScore(score);
       };
 
-      player.on("pointerdown", onDragStart);
-      app.stage.on("pointerup", onDragEnd);
-      app.stage.on("pointerupoutside", onDragEnd);
-
-      // game loop
-      let SCORE = 0;
-      let HIGH_SCORE = 0;
-      let lastShownScore = -1;
-
-      const triggerGameOver = () => {
-        player.clear().circle(0, 0, CIRCLE_RADIUS).fill(0xff0000);
-        topText.text = `GAME OVER! FINAL SCORE: ${Math.floor(SCORE)}`;
+      const triggerGameOver = (stopDragging: () => void) => {
+        setDead();
+        ui.showGameOver(score);
 
         setPhase("gameover");
         stopDragging();
 
-        if (SCORE > HIGH_SCORE) {
-          HIGH_SCORE = Math.floor(SCORE);
-          bottomText.text = `HIGH SCORE: ${HIGH_SCORE}`;
+        const final = Math.floor(score);
+        if (final > highScore) {
+          highScore = final;
+          ui.setHighScore(highScore);
         }
 
         if (gameOverTimeout) window.clearTimeout(gameOverTimeout);
         gameOverTimeout = window.setTimeout(() => {
-          SCORE = 0;
-          lastShownScore = -1;
-          spawnElapsedMs = 0;
-
-          clearObstacles();
-
-          topText.text = "SCORE: 0";
-          player.alpha = 1;
-          player.clear().circle(0, 0, CIRCLE_RADIUS).fill(0x8fbcbb);
-          player.x = app!.screen.width / 2;
-          player.y = app!.screen.height / 2;
-
-          setPhase("idle");
-          topText.text = `SCORE: ${Math.floor(SCORE)}`;
-          middleText.text = INSTRUCTIONS;
+          resetGame();
         }, 5000);
       };
 
-      app.ticker.add((ticker) => {
+      const drag = bindDragControls({
+        app,
+        player,
+        phaseRef,
+        setPhase,
+        onStartPlaying: () => ui.clearInstructions(),
+        onStopPlaying: () => {
+          ui.setInstructions("PAUSED, DRAG TO CONTINUE");
+        },
+      });
+
+      const onTick = (ticker: { deltaMS: number; deltaTime: number }) => {
         const phase = phaseRef.current;
+        if (phase !== "playing") return;
 
-        if (phase === "idle") {
-          return;
-        }
-
-        if (phase === "gameover") {
-          return;
-        }
-
-        // playing
         const dtMS = Math.min(ticker.deltaMS, 50);
-        spawnElapsedMs += dtMS;
 
-        // chance-based spawning
-        const t = Math.min(1, SCORE / 120);
-        const spawnChance = 0.08 + t * 0.1; // 8% -> 18%
+        // spawn
+        spawner.tick(dtMS, score, obstacles.spawn);
 
-        let rollsThisFrame = 0;
-        const MAX_ROLLS_PER_FRAME = 2;
+        // move
+        obstacles.update(ticker.deltaTime);
 
-        while (
-          spawnElapsedMs >= CHECK_MS &&
-          rollsThisFrame < MAX_ROLLS_PER_FRAME
-        ) {
-          spawnElapsedMs -= CHECK_MS;
-          rollsThisFrame++;
-
-          if (Math.random() < spawnChance) {
-            spawnObstacle(SCORE);
-          }
-        }
-
-        for (let i = obstacles.length - 1; i >= 0; i--) {
-          const ob = obstacles[i];
-
-          ob.g.x += ob.vx * ticker.deltaTime;
-          ob.g.y += ob.vy * ticker.deltaTime;
-
-          // bounce x so they don't drift off the sides
-          const minX = CIRCLE_RADIUS;
-          const maxX = app!.screen.width - CIRCLE_RADIUS;
-          if (ob.g.x <= minX) {
-            ob.g.x = minX;
-            ob.vx *= -1;
-          } else if (ob.g.x >= maxX) {
-            ob.g.x = maxX;
-            ob.vx *= -1;
-          }
-
+        // collide
+        for (let i = obstacles.obstacles.length - 1; i >= 0; i--) {
+          const ob = obstacles.obstacles[i];
           if (collisionDetection(player, ob.g)) {
-            triggerGameOver();
+            triggerGameOver(drag.stopDragging);
             return;
           }
-
-          if (ob.g.y - CIRCLE_RADIUS > app!.screen.height) {
-            app!.stage.removeChild(ob.g);
-            ob.g.destroy();
-            obstacles.splice(i, 1);
-          }
         }
 
-        SCORE = SCORE + 0.1;
+        // score
+        score += 0.1;
+        ui.setScore(score);
+      };
 
-        const shown = Math.floor(SCORE);
-        if (shown !== lastShownScore) {
-          lastShownScore = shown;
-          topText.text = `SCORE: ${shown}`;
-        }
-      });
+      app.ticker.add(onTick);
+
+      // cleanup for this run()
+      return () => {
+        if (gameOverTimeout) window.clearTimeout(gameOverTimeout);
+        drag.cleanup();
+        app.ticker.remove(onTick);
+        app.destroy(true);
+      };
     };
 
-    run();
+    let cleanupRun: null | (() => void) = null;
+
+    run().then((cleanup) => {
+      if (typeof cleanup === "function") cleanupRun = cleanup;
+    });
 
     return () => {
       destroyed = true;
       if (gameOverTimeout) window.clearTimeout(gameOverTimeout);
+      if (cleanupRun) cleanupRun();
     };
   }, []);
 
