@@ -4,24 +4,12 @@
   box-sizing: border-box;
 }
 
-body, html, #root {
+body,
+html,
+#root {
   width: 100%;
   height: 100%;
   margin: 0;
   padding: 0;
   overflow: hidden;
-}
-
-body {
-  font-family: "Space Grotesk", -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-}
-
-@font-face {
-    font-family: 'Space Grotesk';
-    src: url('../font/SpaceGrotesk-Medium.woff2') format('woff2'),
-        url('../font/SpaceGrotesk-Medium.woff') format('woff');
-    font-weight: 500;
-    font-style: normal;
-    font-display: swap;
 }
