@@ -11,6 +11,11 @@ const CIRCLE_RADIUS = 30;
 
 type Phase = "idle" | "playing" | "gameover";
 
+async function loadFonts() {
+  await document.fonts.load("16px 'Space Grotesk'");
+  await document.fonts.ready;
+}
+
 function collisionDetection(player: Graphics, obstacle: Graphics): boolean {
   const dx = player.x - obstacle.x;
   const dy = player.y - obstacle.y;
@@ -19,9 +24,7 @@ function collisionDetection(player: Graphics, obstacle: Graphics): boolean {
   return dist2 <= combined * combined;
 }
 
-async function createUI(app: Application, instructions: string) {
-  await document.fonts.load("16px 'Space Grotesk'");
-  await document.fonts.ready;
+function createUI(app: Application, instructions: string) {
 
   const topText = new Text({
     text: "SCORE: 0",
@@ -269,6 +272,8 @@ function App() {
       );
 
       const INSTRUCTIONS = "HOLD TO PLAY\nRELEASE TO PAUSE\nDRAG TO MOVE";
+
+      await loadFonts();
 
       const ui = createUI(app, INSTRUCTIONS);
       const { player, reset, setDead } = createPlayer(app);
