@@ -58,7 +58,7 @@ function createUI(app: Application, instructions: string) {
       }
     },
     showGameOver(score: number) {
-      topText.text = `GAME OVER! FINAL SCORE: ${Math.floor(score)}`;
+      topText.text = `GAME OVER! SCORE: ${Math.floor(score)}`;
     },
     setHighScore(score: number) {
       bottomText.text = `HIGH SCORE: ${score}`;
