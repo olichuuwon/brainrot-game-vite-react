@@ -16,3 +16,12 @@ body {
   font-family: "Space Grotesk", -apple-system, BlinkMacSystemFont,
     "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
+
+@font-face {
+    font-family: 'Space Grotesk';
+    src: url('../font/SpaceGrotesk-Medium.woff2') format('woff2'),
+        url('../font/SpaceGrotesk-Medium.woff') format('woff');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
