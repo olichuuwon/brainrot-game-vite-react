@@ -10,6 +10,8 @@ Hold the circle to play. Let go and everything freezes exactly where it was,
 the game runs on a dead man's switch, so nothing advances while you aren't
 holding it. That's the whole design, where it's built for divided attention.
 
+Avoid the red balls, and seek for the green ones (TBD)!
+
 ## Tech stack
 
 | | |
